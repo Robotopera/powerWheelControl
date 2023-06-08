@@ -1,4 +1,7 @@
-//#include <ServoInput.h>
+#include <Servo.h>
+
+Servo ESC;
+Servo Steering;
 
 //define pinouts
 
@@ -12,6 +15,8 @@
 #define pin_pedBrake 8
 #define pin_outESC 9
 #define pin_outSteering 10
+#define pin_switchDirection 11
+#define pin_switchSpeed 12
 
 //set variables
 int rcSteering;
@@ -21,14 +26,17 @@ int rcLockOut;
 int throttleOutput;
 int pedThrottleInput;
 int pedBrakeInput;
+int switchSpeed;
+int switchDirection;
 //int speedLimit;
 
+//rc reciever
 void readRC(){
     rcSteering = pulseIn(pin_rcSteering, HIGH, 200);
     rcThrottleInput = pulseIn(pin_rcThrottle, HIGH, 200);
     rcLockOut = pulseIn(pin_rcLockout, HIGH, 200);
-    rcSteering = map(rcSteering,1000,2000,-30,30);
-    rcThrottleInput = map(rcThrottleInput,1000,2000,-100,100);
+    rcSteering = map(rcSteering,1000,2000,0,180);
+    rcThrottleInput = map(rcThrottleInput,1000,2000,0,180);
     if (rcLockOut < 1500){
         rcLockOut = 1;
     } else {
@@ -37,43 +45,55 @@ void readRC(){
     
 }
 
+//dashboard switches
+void readSwitches(){
+    switchDirection = digitalRead(pin_switchDirection);
+    switchSpeed = digitalRead(pin_switchSpeed);
+}
+
+//hall effect pedals
 void readPedals(){
     if (rcLockOut = 0){
         pedThrottleInput = analogRead(pin_pedThrottle);
         pedBrakeInput = analogRead(pin_pedBrake);
-        pedThrottleInput = map(pedThrottleInput,0,1023,0,100);
-        pedBrakeInput = map(pedBrakeInput,0,1023,0,100);
+        pedThrottleInput = map(pedThrottleInput,0,1023,90,180);
+        pedBrakeInput = map(pedBrakeInput,0,1023,90,0);
     } else {
         pedThrottleInput = 0;
         pedBrakeInput = 0;
     }
 }
 
+//determine appropriate throttle level
 void setThrottle(){
     if (rcLockOut = 0){
-        throttleOutput = max(rcThrottleInput,pedThrottleInput);
+        throttleOutput = max(rcThrottleInput,pedThrottleInput); //set throttle output to greater of pedal and rc
     } else {
         throttleOutput = rcThrottleInput;
     }
-}
-void writeESC(){
-    analogWrite(pin_outESC,throttleOutput);
+    if (switchSpeed = LOW){
+        throttleOutput = map(throttleOutput,90,180,90,135); //cut throttle output to half if low speed switch is on
+    }
+    if (switchDirection = LOW){
+        throttleOutput = map(throttleOutput,90,180,90,0); //set throttle output to range 90(stop) to 0 (full reverse)
+    }
 }
 
-void writeSteering(){
-    analogWrite(pin_outSteering,rcSteering);
+//go go go
+void writeDrive(){
+    Steering.write(steeringOutput);
+    ESC.write(throttleOutput);
 }
 
 void setup() {
+    ESC.attach(pin_outESC,1000,2000); //attach to dual motor esc
+    Steering.attach(pin_outSteering,1000,2000); //attach to steering servo
 }
 
 void loop() {
-
-readRC;
-readPedals;
-setThrottle;
-writeESC;
-writeSteering;
-
-
+    readRC;
+    readPedals;
+    readSwitches;
+    setThrottle;
+    writeDrive;
 }
